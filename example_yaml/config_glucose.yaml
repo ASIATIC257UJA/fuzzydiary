@@ -1,0 +1,104 @@
+signal:
+  signal_name: "glucose"
+  sampling_period_minutes: 5
+  unit: "mg/dL"
+
+io:
+  timestamp_column: "timestamp"
+  value_column: "value"
+  empty_interval_threshold: 3
+  max_gap_minutes: 30
+
+rdp:
+  epsilon: "auto"
+  auto_std_fraction: 0.05
+
+linguistic_variable:
+  universe_min: 0
+  universe_max: 400
+  terms:
+    very_low:  {type: trapezoid, a: 0,   b: 0,   c: 54,  d: 70}
+    low:       {type: trapezoid, a: 54,  b: 70,  c: 80,  d: 100}
+    medium:    {type: trapezoid, a: 80,  b: 100, c: 140, d: 180}
+    high:      {type: trapezoid, a: 140, b: 180, c: 220, d: 250}
+    very high: {type: trapezoid, a: 220, b: 250, c: 400, d: 400}
+
+quantifiers:
+  - name: "many"
+    membership: {a: 0.15, b: 0.35, c: 0.55, d: 0.7}
+  - name: "most"
+    membership: {a: 0.55, b: 0.7, c: 0.9, d: 0.97}
+  - name: "almost_all"
+    membership: {a: 0.9, b: 0.97, c: 1.0, d: 1.0}
+
+contexts:
+  - name: "day_moment"
+    universe_min: 0.0
+    universe_max: 24.0
+    terms:
+      night:  {a: 0,  b: 0,  c: 5,  d: 7}
+      morning:      {a: 5,  b: 7,  c: 12, d: 14}
+      afternoon:    {a: 12, b: 14, c: 19, d: 21}
+      end of the day:   {a: 19, b: 21, c: 24, d: 24}
+
+  - name: "ingestion"
+    universe_min: 0.0
+    universe_max: 24.0
+    terms:
+      breakfast: {a: 6,  b: 8,  c: 9,  d: 11}
+      lunch:     {a: 12, b: 13, c: 14, d: 16}
+      dinner:    {a: 19, b: 20, c: 22, d: 23}
+
+events:
+  describe_lines: false
+
+  event_colors:
+    hypoglycaemia:          "#2471A3"
+    prolonged hypoglycaemia: "#1A5276"
+    peak:                   "#E67E22"
+    hyperglycaemia:         "#C0392B"
+    recovery from low:          "#76D7C4"
+    recovery from high:         "#F1948A"
+
+  catalogue:
+    - label: hypoglycaemia
+      pattern:
+        - level: [low, very_low]
+      min_duration_minutes: 15
+      merge_gap_minutes: 60
+
+    - label: prolonged hypoglycaemia
+      pattern:
+        - level: [low, very_low]
+      min_duration_minutes: 120
+      merge_gap_minutes: 60
+
+    - label: peak
+      pattern:
+        - level: [high, very_high]
+      min_duration_minutes: 15
+      merge_gap_minutes: 30
+
+    - label: hyperglycaemia
+      pattern:
+        - level: [high, very_high]
+      min_duration_minutes: 60
+      merge_gap_minutes: 60
+
+    - label: recovery from low
+      anchor_labels: [hypoglycaemia, prolonged hypoglycaemia]
+      pattern:
+        - level: [medium]
+      min_duration_minutes: 15
+      max_gap_minutes: 30
+
+    - label: recovery from high
+      anchor_labels: [peak, hyperglycaemia]
+      pattern:
+        - level: [medium]
+      min_duration_minutes: 15
+      max_gap_minutes: 30
+
+protoforms:
+  - template: "In the {day_moment}, {Q} of the glucose levels are {A}"
+  - template: "During {ingestion}, {Q} of the glucose levels are {A}"
