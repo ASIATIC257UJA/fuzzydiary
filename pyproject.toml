@@ -21,5 +21,8 @@ dependencies = [
 "jinja2>=3.0",
 ]
 
+[project.scripts]
+fuzzydiary = "fuzzydiary.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
