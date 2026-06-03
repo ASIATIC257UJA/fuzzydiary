@@ -1,6 +1,6 @@
 # FuzzyDiary
 
-**A protoform-based framework for morphology-aware linguistic summarization of univariate time series.**
+**An open-source framework for morphology-aware and traceable linguistic summarization of clinical time series.**
 
 FuzzyDiary transforms a univariate time series and a YAML configuration file into a self-contained, auditable narrative report. The framework detects morphological events (peaks, valleys, sustained increases and decreases, plateaus, oscillations, and regime changes), evaluates fuzzy protoforms, aggregates the resulting summaries over user-defined periods, and generates an interactive HTML report in which every textual statement can be traced back to the original signal.
 
