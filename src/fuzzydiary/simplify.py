@@ -14,6 +14,18 @@ with warnings.catch_warnings():
 from fuzzydiary.io import Series
 
 
+def _pldist2d(point, start, end):
+    """
+    Perpendicular distance from `point` to the line (`start`, `end`) in 2-D.
+    """
+    if np.all(np.equal(start, end)):
+        return np.linalg.norm(point - start)
+
+    ux, uy = end[0] - start[0], end[1] - start[1]
+    vx, vy = start[0] - point[0], start[1] - point[1]
+    return abs(ux * vy - uy * vx) / np.hypot(ux, uy)
+
+
 @dataclass
 class SimplifiedSeries:
     """
@@ -167,7 +179,7 @@ def _rdp_run(run: pd.DataFrame, eps: float) -> pd.DataFrame:
     points = np.column_stack([x_norm, y_norm])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=DeprecationWarning)
-        mask = rdp(points, epsilon=eps, return_mask=True)
+        mask = rdp(points, epsilon=eps, dist=_pldist2d, return_mask=True)
 
     kept = run.iloc[np.where(mask)[0]].copy()
     return kept
