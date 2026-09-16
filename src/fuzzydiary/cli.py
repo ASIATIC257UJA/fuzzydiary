@@ -13,6 +13,7 @@ from fuzzydiary import (
     simplify,
 )
 from fuzzydiary.config import load_config
+from fuzzydiary.nlg import narrate_day_paragraph
 
 
 def _resolve_eps(value: str) -> float | str:
@@ -83,6 +84,22 @@ def _cmd_describe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_narrate(args: argparse.Namespace) -> int:
+    if not args.config:
+        print("[fuzzydiary] 'narrate' requires --config.", file=sys.stderr)
+        return 2
+    cfg = load_config(args.config)
+    series = load_series(args.series, config=cfg)
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    events = detect_events(simplified, config=cfg, series=series)
+    daily = describe(series, events, cfg, simplified=simplified)
+
+    for day in sorted(daily.days):
+        print(narrate_day_paragraph(daily.days[day], cfg))
+        print()
+    return 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     series = load_series(args.series, config=cfg)
@@ -136,6 +153,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_desc.add_argument("--series", required=True, type=Path)
     p_desc.add_argument("--epsilon", default="auto")
     p_desc.set_defaults(func=_cmd_describe)
+
+    p_nar = sub.add_parser(
+        "narrate",
+        help="Synthesised narrative summary, without rendering the report.",
+    )
+    p_nar.add_argument("--config", required=True, type=Path)
+    p_nar.add_argument("--series", required=True, type=Path)
+    p_nar.add_argument("--epsilon", default="auto")
+    p_nar.set_defaults(func=_cmd_narrate)
 
     p_ver = sub.add_parser("version", help="Print version.")
     p_ver.set_defaults(func=_cmd_version)

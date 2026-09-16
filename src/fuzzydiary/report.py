@@ -9,6 +9,8 @@ from fuzzydiary.describe import DailySummaryCollection
 from fuzzydiary.events import EventCollection
 from fuzzydiary.io import Series
 from fuzzydiary.narrate import narrate_daily
+from fuzzydiary.nlg import realize_clauses
+from fuzzydiary.synthesis import synthesize_day
 
 
 def render_report(
@@ -109,10 +111,10 @@ def _signal_overview_figure(
     fig.update_layout(
         template='simple_white',
         margin=dict(l=40, r=20, t=30, b=80),
-        height=400,
+        height=250,
         xaxis_title="Time",
         yaxis_title=unit,
-        legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+        legend=dict(orientation="h", yanchor="top", y=-0.5, xanchor="center", x=0.5),
     )
     return fig.to_html(full_html=False, include_plotlyjs="cdn" if use_cdn else True)
 
@@ -165,17 +167,50 @@ def _daily_section(daily: DailySummaryCollection, cfg=None) -> str:
             )
         proto_table = (
             "<table class='fd-table'>"
-            "<thead><tr><th>linguistic summary</th><th>DoT</th></tr></thead>"
+            "<thead><tr><th>Protoform</th><th>DoT</th></tr></thead>"
             "<tbody>" + "".join(proto_rows) + "</tbody></table>"
         ) if proto_rows else "<p><em>No protoforms above threshold.</em></p>"
 
+        narrative = _daily_narrative_block(summary, cfg)
+
         parts.append(
             f"<details open><summary><b>{day.date()}</b></summary>"
+            f"{narrative}"
             f"<p><b>Detected events</b></p>{ev_table}"
-            f"<p><b>Daily linguistic summary</b></p>{proto_table}"
+            f"<p><b>Activated protoforms across data</b></p>{proto_table}"
             f"</details>"
         )
     return "\n".join(parts)
+
+
+def _daily_narrative_block(summary, cfg=None) -> str:
+    if cfg is None or not getattr(getattr(cfg, "synthesis", None), "enabled", False):
+        return ""
+
+    synthesis = synthesize_day(
+        summary, cfg,
+        primary_context=cfg.synthesis.primary_context,
+        inclusion_threshold=cfg.synthesis.inclusion_threshold,
+    )
+    clauses = realize_clauses(synthesis, cfg)
+    if not clauses:
+        return ""
+
+    spans = []
+    for clause in clauses:
+        evidence = [f"{st.text} (DoT={st.truth:.2f})" for st in clause.support]
+        if clause.events:
+            kinds = ", ".join(node.kind for node in clause.events)
+            evidence.append(f"events: {kinds}")
+        tooltip = _escape_attr(" | ".join(evidence))
+        spans.append(
+            f'<span class="fd-clause" title="{tooltip}">{_escape(clause.text)}.</span>'
+        )
+
+    return (
+        "<p><b>Narrative summary</b></p>"
+        f"<p class='fd-narrative'>{' '.join(spans)}</p>"
+    )
 
 
 _HTML_TEMPLATE = """<!doctype html>
@@ -191,7 +226,9 @@ _HTML_TEMPLATE = """<!doctype html>
     details { margin: 12px 0; padding: 10px 14px; border: 1px solid #e3e6ea;
               border-radius: 8px; background: #fafbfd; }
     summary { cursor: pointer; padding: 4px 0; font-size: 1.02em; }
-    .fd-narrative { line-height: 1.5; white-space: pre-wrap; }
+    .fd-narrative { line-height: 1.6; }
+    .fd-clause { border-bottom: 1px dotted #c3ccd8; cursor: help; }
+    .fd-clause:hover { background: #eef3fa; }
     .fd-table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.92em; }
     .fd-table th, .fd-table td { border: 1px solid #e3e6ea; padding: 6px 8px; text-align: left; }
     .fd-table th { background: #f0f3f7; }
@@ -217,6 +254,10 @@ def _render_template(title: str, sections: list[dict], plotly_cdn: bool) -> str:
 
 def _truncate(text: str, n: int) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
+
+
+def _escape_attr(text: str) -> str:
+    return _escape(text).replace('"', "&quot;")
 
 
 def _escape(text: str) -> str:

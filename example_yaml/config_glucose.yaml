@@ -53,21 +53,21 @@ events:
   describe_lines: false
 
   event_colors:
-    hypoglycaemia:          "#2471A3"
-    prolonged hypoglycaemia: "#1A5276"
+    hypoglycemia:          "#2471A3"
+    prolonged hypoglycemia: "#1A5276"
     peak:                   "#E67E22"
-    hyperglycaemia:         "#C0392B"
+    hyperglycemia:         "#C0392B"
     recovery from low:          "#76D7C4"
     recovery from high:         "#F1948A"
 
   catalogue:
-    - label: hypoglycaemia
+    - label: hypoglycemia
       pattern:
         - level: [low, very_low]
       min_duration_minutes: 15
       merge_gap_minutes: 60
 
-    - label: prolonged hypoglycaemia
+    - label: prolonged hypoglycemia
       pattern:
         - level: [low, very_low]
       min_duration_minutes: 120
@@ -79,25 +79,29 @@ events:
       min_duration_minutes: 15
       merge_gap_minutes: 30
 
-    - label: hyperglycaemia
+    - label: hyperglycemia
       pattern:
         - level: [high, very_high]
       min_duration_minutes: 60
       merge_gap_minutes: 60
 
     - label: recovery from low
-      anchor_labels: [hypoglycaemia, prolonged hypoglycaemia]
+      anchor_labels: [hypoglycemia, prolonged hypoglycemia]
       pattern:
         - level: [medium]
       min_duration_minutes: 15
       max_gap_minutes: 30
 
     - label: recovery from high
-      anchor_labels: [peak, hyperglycaemia]
+      anchor_labels: [peak, hyperglycemia]
       pattern:
         - level: [medium]
       min_duration_minutes: 15
       max_gap_minutes: 30
+
+lexicon:
+  scopes:
+    end of the day: "at the end of the day"
 
 protoforms:
   - template: "In the {day_moment}, {Q} of the glucose levels are {A}"

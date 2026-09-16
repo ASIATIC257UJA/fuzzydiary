@@ -232,6 +232,20 @@ class ProtoformTemplate(BaseModel):
     description: str | None = None
 
 
+class LexiconConfig(BaseModel):
+    terms: dict[str, str] = Field(default_factory=dict)
+    scopes: dict[str, str] = Field(default_factory=dict)
+    quantifiers: dict[str, str] = Field(default_factory=dict)
+    subordinates: dict[str, str] = Field(default_factory=dict)
+    events: dict[str, str] = Field(default_factory=dict)
+
+
+class SynthesisConfig(BaseModel):
+    enabled: bool = True
+    primary_context: str | None = None
+    inclusion_threshold: float = 0.5
+
+
 class SignalConfig(BaseModel):
     signal_name: str = "signal"
     sampling_period_minutes: float = 5.0
@@ -273,6 +287,8 @@ class FuzzyDiaryConfig(BaseModel):
     contexts: list[ContextDimension] = Field(default_factory=list)
     events: EventsConfig = Field(default_factory=EventsConfig)
     protoforms: list[ProtoformTemplate] = Field(default_factory=list)
+    synthesis: SynthesisConfig = Field(default_factory=SynthesisConfig)
+    lexicon: LexiconConfig = Field(default_factory=LexiconConfig)
 
 
 def load_config(path: str | Path) -> FuzzyDiaryConfig:
