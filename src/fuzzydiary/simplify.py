@@ -15,9 +15,6 @@ from fuzzydiary.io import Series
 
 
 def _pldist2d(point, start, end):
-    """
-    Perpendicular distance from `point` to the line (`start`, `end`) in 2-D.
-    """
     if np.all(np.equal(start, end)):
         return np.linalg.norm(point - start)
 
@@ -28,12 +25,6 @@ def _pldist2d(point, start, end):
 
 @dataclass
 class SimplifiedSeries:
-    """
-    Output of `simplify`: per-day piecewise-linear approximation of the
-    original signal. Each day maps to a DataFrame holding the surviving
-    breakpoints (timestamp + value) selected by RDP.
-    """
-
     days: dict[pd.Timestamp, pd.DataFrame]
     epsilon_used: dict[pd.Timestamp, float]
 
@@ -51,26 +42,6 @@ def simplify(
     epsilon: float | Literal["auto"] = "auto",
     auto_std_fraction: float = 0.2,
 ) -> SimplifiedSeries:
-    """
-    Reduce each daily window of `series` to a compact piecewise-linear
-    approximation using the Ramer-Douglas-Peucker algorithm.
-
-    Parameters
-    ----------
-    series : Series
-        Output of `load_series`.
-    epsilon : float or 'auto'
-        RDP tolerance on the normalised representation (values in [0, 1] on
-        both axes). When 'auto', for each day epsilon is set to
-        `auto_std_fraction * (std/range)`, clipped to a sensible minimum.
-        Typical good values: 0.01 - 0.05.
-    auto_std_fraction : float
-        Multiplier used only when `epsilon == 'auto'`.
-
-    Returns
-    -------
-    SimplifiedSeries
-    """
     if not isinstance(series, Series):
         raise TypeError(f"Expected a Series, got {type(series).__name__}.")
     if epsilon != "auto" and not isinstance(epsilon, (int, float)):
@@ -98,7 +69,6 @@ def _resolve_epsilon(
     epsilon: float | Literal["auto"],
     auto_std_fraction: float,
 ) -> float:
-    """Return the RDP tolerance to use for one day."""
     if epsilon != "auto":
         return float(epsilon)
 
@@ -116,12 +86,6 @@ def _resolve_epsilon(
 
 
 def _simplify_one_day(day_df: pd.DataFrame, eps: float) -> pd.DataFrame:
-    """
-    Apply RDP to a single day, handling NaN runs gracefully.
-
-    The day is split at NaN gaps; each contiguous non-NaN run is simplified
-    independently, and the surviving breakpoints are concatenated.
-    """
     if day_df.empty:
         return day_df.iloc[0:0].copy()
 
@@ -139,7 +103,6 @@ def _simplify_one_day(day_df: pd.DataFrame, eps: float) -> pd.DataFrame:
 
 
 def _split_on_nan(day_df: pd.DataFrame) -> list[pd.DataFrame]:
-    """Split a daily DataFrame into contiguous non-NaN runs."""
     values = day_df["value"]
     valid = values.notna().to_numpy()
     if not valid.any():
@@ -147,11 +110,11 @@ def _split_on_nan(day_df: pd.DataFrame) -> list[pd.DataFrame]:
 
     edges = np.diff(valid.astype(np.int8), prepend=0, append=0)
     starts = np.where(edges == 1)[0]
-    ends = np.where(edges == -1)[0]  # exclusive
+    ends = np.where(edges == -1)[0]
 
     runs: list[pd.DataFrame] = []
     for s, e in zip(starts, ends):
-        if e - s >= 2:  # need at least two points for RDP
+        if e - s >= 2:
             runs.append(day_df.iloc[s:e])
         elif e - s == 1:
             runs.append(day_df.iloc[s:e])
@@ -159,7 +122,6 @@ def _split_on_nan(day_df: pd.DataFrame) -> list[pd.DataFrame]:
 
 
 def _rdp_run(run: pd.DataFrame, eps: float) -> pd.DataFrame:
-    """Apply RDP to a single non-NaN run and return surviving breakpoints."""
     n = len(run)
     if n <= 2:
         return run.copy()

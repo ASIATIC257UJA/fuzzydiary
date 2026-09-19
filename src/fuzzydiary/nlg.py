@@ -9,7 +9,6 @@ from fuzzydiary.synthesis import (
     EventNode,
     LabelHierarchy,
     ScopeGroup,
-    SynthesisNode,
     build_label_hierarchy,
     quantifier_order,
     synthesize_day,
@@ -60,6 +59,7 @@ class RealizedClause:
     text: str
     support: list[Statement] = field(default_factory=list)
     events: list[EventNode] = field(default_factory=list)
+    scopes: list[str] = field(default_factory=list)
 
 
 def lexicalize(label: str, kind: str = "term", cfg: FuzzyDiaryConfig | None = None) -> str:
@@ -181,7 +181,12 @@ def realize_clauses(day: DaySynthesis, cfg: FuzzyDiaryConfig) -> list[RealizedCl
     for index, clause in enumerate(clauses):
         text = _realize_one(clause, cfg, signal, first=index == 0, hierarchy=hierarchy)
         if text:
-            out.append(RealizedClause(text=text, support=clause.support, events=clause.events))
+            out.append(RealizedClause(
+                text=text,
+                support=clause.support,
+                events=clause.events,
+                scopes=list(clause.scopes),
+            ))
     return out
 
 
@@ -190,7 +195,6 @@ def realize_day(
     cfg: FuzzyDiaryConfig,
     include_date: bool = True,
 ) -> str:
-    """Realize one day as a single cohesive paragraph."""
     realized = realize_clauses(day, cfg)
     if not realized:
         return f"No describable activity on {day.day.date()}."

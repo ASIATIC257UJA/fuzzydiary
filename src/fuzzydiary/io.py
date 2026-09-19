@@ -13,20 +13,6 @@ from fuzzydiary.config import FuzzyDiaryConfig, IOConfig, SignalConfig, load_con
 
 @dataclass
 class Series:
-    """
-    Canonical representation of a loaded univariate time series.
-
-    Attributes
-    ----------
-    data : pd.DataFrame
-        DataFrame indexed by datetime, with a single column 'value'.
-    days : dict[pd.Timestamp, pd.DataFrame]
-        Per-day segmentation; each key is a calendar day (midnight),
-        each value is the slice of `data` falling on that day.
-    signal : SignalConfig
-        Signal metadata (name, unit, sampling period).
-    """
-
     data: pd.DataFrame
     days: dict[pd.Timestamp, pd.DataFrame] = field(default_factory=dict)
     signal: SignalConfig = field(default_factory=SignalConfig)
@@ -47,26 +33,6 @@ def load_series(
     path: PathLike | pd.DataFrame,
     config: FuzzyDiaryConfig | PathLike | None = None,
 ) -> Series:
-    """
-    Ingest a univariate time series and return the canonical representation.
-
-    Parameters
-    ----------
-    path : str, Path, or pandas.DataFrame
-        Source of the data. Supported formats:
-          - CSV file with at least a timestamp column and a value column.
-          - JSON file (records orientation) with the same columns.
-          - In-memory pandas.DataFrame.
-    config : FuzzyDiaryConfig, str, Path, or None
-        Configuration object or path to a YAML configuration. If None,
-        defaults are used (sampling period 5 min, 'timestamp' and 'value'
-        columns expected, etc.).
-
-    Returns
-    -------
-    Series
-        Canonical representation with resampled data and per-day segmentation.
-    """
     cfg = _resolve_config(config)
 
     raw = _read_raw(path)
@@ -81,7 +47,6 @@ def load_series(
 def _resolve_config(
     config: FuzzyDiaryConfig | PathLike | None,
 ) -> FuzzyDiaryConfig:
-    """Return a FuzzyDiaryConfig from any acceptable input."""
     if isinstance(config, FuzzyDiaryConfig):
         return config
     if config is not None:
@@ -102,7 +67,6 @@ def _resolve_config(
 
 
 def _read_raw(path: PathLike | pd.DataFrame) -> pd.DataFrame:
-    """Read raw data from disk or accept an in-memory DataFrame."""
     if isinstance(path, pd.DataFrame):
         return path.copy()
 
@@ -130,11 +94,6 @@ def _read_raw(path: PathLike | pd.DataFrame) -> pd.DataFrame:
 
 
 def _normalise_columns(df: pd.DataFrame, io_cfg: IOConfig) -> pd.DataFrame:
-    """
-    Identify the timestamp and value columns according to the IO config,
-    parse the timestamp, drop duplicates, and return a DataFrame indexed
-    by datetime with a single 'value' column.
-    """
     if df.empty:
         raise ValueError("Input data is empty.")
 
@@ -171,14 +130,10 @@ def _resample_and_impute(
     io_cfg: IOConfig,
     sampling_period_minutes: float,
 ) -> pd.DataFrame:
-    """
-    Resample to the target period, impute short gaps via centred rolling mean,
-    and leave longer gaps as NaN (to be picked up by `_split_by_day`).
-    """
     rule = f"{int(sampling_period_minutes)}min"
     resampled = df["value"].resample(rule).mean().to_frame("value")
 
-    window = 7  # samples; mirrors the legacy preprocess.py heuristic.
+    window = 7
     min_periods = max(1, int(io_cfg.empty_interval_threshold))
     rolled = (
         resampled["value"]
@@ -193,7 +148,7 @@ def _resample_and_impute(
     if io_cfg.max_gap_minutes and io_cfg.max_gap_minutes > 0:
         max_gap_samples = int(np.ceil(io_cfg.max_gap_minutes / sampling_period_minutes))
         if max_gap_samples > 0:
-            gap_id = (~mask).cumsum()  # contiguous NaN runs share an id
+            gap_id = (~mask).cumsum()
             sizes = mask.groupby(gap_id).transform("sum")
             wide = mask & (sizes > max_gap_samples)
             filled.loc[wide] = np.nan
@@ -203,12 +158,6 @@ def _resample_and_impute(
 
 
 def _split_by_day(df: pd.DataFrame) -> dict[pd.Timestamp, pd.DataFrame]:
-    """
-    Partition the resampled series into a dict keyed by calendar day.
-
-    Days are kept even if partially missing; the downstream modules decide
-    what to do with a sparse day.
-    """
     if df.empty:
         return {}
 

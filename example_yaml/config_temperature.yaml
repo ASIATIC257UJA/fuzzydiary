@@ -1,0 +1,71 @@
+signal:
+  signal_name: "temperature"
+  sampling_period_minutes: 15
+  unit: "C"
+
+io:
+  timestamp_column: "timestamp"
+  value_column: "value"
+  empty_interval_threshold: 2
+  max_gap_minutes: 60
+
+rdp:
+  epsilon: "auto"
+  auto_std_fraction: 0.2
+
+linguistic_variable:
+  universe_min: -10
+  universe_max: 45
+  terms:
+    cold:    {a: -10, b: -10, c: 5,  d: 12}
+    mild:    {a: 5,   b: 12,  c: 20, d: 24}
+    warm:    {a: 20,  b: 24,  c: 30, d: 33}
+    hot:     {a: 30,  b: 33,  c: 45, d: 45}
+
+quantifiers:
+  - name: "few"
+    membership:        {a: 0.0, b: 0.0, c: 0.1, d: 0.3}
+  - name: "many"
+    membership:        {a: 0.2, b: 0.4, c: 0.6, d: 0.8}
+  - name: "most"
+    membership:        {a: 0.5, b: 0.7, c: 0.9, d: 1.0}
+  - name: "almost_all"
+    membership:        {a: 0.8, b: 0.95, c: 1.0, d: 1.0}
+
+contexts: []
+
+events:
+  event_colors:
+    cold spell: "#3D6FA8"
+    warm spell: "#C0392B"
+    heat episode: "#8C5320"
+
+  catalogue:
+    - label: cold spell
+      pattern:
+        - level: [cold]
+      min_duration_minutes: 60
+      merge_gap_minutes: 60
+
+    - label: warm spell
+      pattern:
+        - level: [warm, hot]
+      min_duration_minutes: 60
+      merge_gap_minutes: 60
+
+    - label: heat episode
+      pattern:
+        - level: [hot]
+      min_duration_minutes: 120
+      merge_gap_minutes: 60
+
+    - label: mild recovery
+      anchor_labels: [heat episode, warm spell]
+      pattern:
+        - level: [mild]
+      min_duration_minutes: 60
+      max_gap_minutes: 120
+
+protoforms:
+  - template: "{Q} of the values of the {kind} are {A}"
+  - template: "Of the events that are {A}, {Q} are {B}"

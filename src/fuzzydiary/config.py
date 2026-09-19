@@ -73,23 +73,6 @@ MembershipFunction = Annotated[
 ]
 
 
-def _mf_from_raw(raw: Any) -> MembershipFunction:
-    if isinstance(raw, dict):
-        kind = raw.get("type", "trapezoid")
-        if kind == "trapezoid":
-            return Trapezoid.model_validate(raw)
-        if kind == "triangle":
-            return Triangle.model_validate(raw)
-        if kind == "gaussian":
-            return Gaussian.model_validate(raw)
-        if kind == "singleton":
-            return Singleton.model_validate(raw)
-        raise ValueError(f"Unknown membership function type: {kind!r}")
-    if isinstance(raw, (list, tuple)) and len(raw) == 4:
-        return Trapezoid(a=raw[0], b=raw[1], c=raw[2], d=raw[3])
-    raise ValueError(f"Cannot parse membership function from {raw!r}")
-
-
 class LinguisticVariable(BaseModel):
     universe_min: float
     universe_max: float

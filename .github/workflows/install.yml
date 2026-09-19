@@ -1,0 +1,56 @@
+name: install
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  install:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install from a clean environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Report the resolved dependency versions
+        run: python -m pip list
+
+      - name: Run the shipped examples end to end
+        shell: bash
+        run: |
+          fuzzydiary run --config example_yaml/config_minimal.yaml \
+            --series example_data/data.csv --output ./report_minimal
+          fuzzydiary run --config example_yaml/config_glucose.yaml \
+            --series example_data/data.csv --output ./report_glucose
+
+      - name: Check that the report is self-contained
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re, sys
+          html = open("report_glucose/index.html", encoding="utf-8").read()
+          remote = (
+              re.findall(r'<script[^>]+src="([^"]+)"', html)
+              + re.findall(r'<link[^>]+href="([^"]+)"', html)
+          )
+          if remote:
+              sys.exit(f"the report fetches remote resources: {remote}")
+          if "Plotly.newPlot" not in html or len(html) < 500_000:
+              sys.exit("the Plotly library does not seem to be embedded")
+          print("self-contained report OK:", len(html), "bytes")
+          PY

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pandas as pd
 import plotly.graph_objects as go
 from jinja2 import Template
 
+from fuzzydiary.config import FuzzyDiaryConfig, load_config
 from fuzzydiary.describe import DailySummaryCollection
 from fuzzydiary.events import EventCollection
+from fuzzydiary.fuzzy import membership_degree
 from fuzzydiary.io import Series
-from fuzzydiary.narrate import narrate_daily
 from fuzzydiary.nlg import realize_clauses
 from fuzzydiary.synthesis import synthesize_day
+_SIGNAL_DIV_ID = "fd-signal"
 
 
 def render_report(
@@ -18,9 +22,10 @@ def render_report(
     events: EventCollection | None = None,
     daily: DailySummaryCollection | None = None,
     output: str | Path = "./report/index.html",
-    plotly_cdn: bool = True,
-    cfg=None,
+    plotly_cdn: bool = False,
+    config: FuzzyDiaryConfig | str | Path | None = None,
 ) -> Path:
+    cfg = config if config is None or isinstance(config, FuzzyDiaryConfig) else load_config(config)
     output = Path(output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +41,6 @@ def render_report(
     html = _render_template(
         title=f"FuzzyDiary report — {series.signal.signal_name}",
         sections=sections,
-        plotly_cdn=plotly_cdn,
     )
     output.write_text(html, encoding="utf-8")
     return output
@@ -116,7 +120,11 @@ def _signal_overview_figure(
         yaxis_title=unit,
         legend=dict(orientation="h", yanchor="top", y=-0.5, xanchor="center", x=0.5),
     )
-    return fig.to_html(full_html=False, include_plotlyjs="cdn" if use_cdn else True)
+    return fig.to_html(
+        full_html=False,
+        include_plotlyjs="cdn" if use_cdn else True,
+        div_id=_SIGNAL_DIV_ID,
+    )
 
 
 def _daily_section(daily: DailySummaryCollection, cfg=None) -> str:
@@ -203,14 +211,102 @@ def _daily_narrative_block(summary, cfg=None) -> str:
             kinds = ", ".join(node.kind for node in clause.events)
             evidence.append(f"events: {kinds}")
         tooltip = _escape_attr(" | ".join(evidence))
+        spans_attr = _spans_attr(_clause_spans(clause, summary, cfg))
         spans.append(
-            f'<span class="fd-clause" title="{tooltip}">{_escape(clause.text)}.</span>'
+            f'<span class="fd-clause fd-linked" tabindex="0" '
+            f'title="{tooltip}" data-fd-spans="{spans_attr}">'
+            f"{_escape(clause.text)}.</span>"
         )
 
     return (
         "<p><b>Narrative summary</b></p>"
         f"<p class='fd-narrative'>{' '.join(spans)}</p>"
     )
+
+
+def _spans_attr(spans: list[tuple]) -> str:
+    payload = [
+        [pd.Timestamp(start).isoformat(), pd.Timestamp(end).isoformat()]
+        for start, end in _merge_spans(spans)
+    ]
+    return _escape_attr(json.dumps(payload, separators=(",", ":")))
+
+
+def _merge_spans(spans: list[tuple]) -> list[tuple]:
+    clean = [(s, e) for s, e in spans if s is not None and e is not None]
+    if not clean:
+        return []
+    merged: list[list] = []
+    for start, end in sorted(clean):
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(s, e) for s, e in merged]
+
+
+def _clause_spans(clause, summary, cfg=None) -> list[tuple]:
+    spans: list[tuple] = []
+    for node in clause.events:
+        spans.extend(_event_node_spans(node))
+    for statement in clause.support:
+        start = statement.evidence.get("start")
+        end = statement.evidence.get("end")
+        if start is not None and end is not None:
+            spans.append((start, end))
+    if not spans:
+        spans.extend(_scope_spans(clause.scopes, summary.day, cfg))
+    return _merge_spans(spans)
+
+
+def _event_node_spans(node) -> list[tuple]:
+    spans = [(node.description.event.start, node.description.event.end)]
+    for child in node.children:
+        spans.extend(_event_node_spans(child))
+    return spans
+
+
+def _scope_spans(scopes: list[str], day, cfg=None, alpha: float = 0.5) -> list[tuple]:
+    if not scopes or cfg is None or not cfg.contexts:
+        return []
+
+    requested = getattr(getattr(cfg, "synthesis", None), "primary_context", None)
+    dimension = None
+    for dim in cfg.contexts:
+        if requested and dim.name == requested:
+            dimension = dim
+            break
+    if dimension is None:
+        dimension = cfg.contexts[0]
+
+    day_start = pd.Timestamp(day).normalize()
+    spans: list[tuple] = []
+    for scope in scopes:
+        if scope not in dimension.terms:
+            continue
+        cut = _alpha_cut(dimension, scope, alpha)
+        if cut is None:
+            continue
+        low, high = cut
+        spans.append((
+            day_start + pd.Timedelta(hours=float(low)),
+            day_start + pd.Timedelta(hours=float(high)),
+        ))
+    return spans
+
+
+def _alpha_cut(dimension, term: str, alpha: float, grid: int = 512):
+    mf = dimension.mf_as_dict(term)
+    low, high = float(dimension.universe_min), float(dimension.universe_max)
+    step = (high - low) / (grid - 1) if grid > 1 else 0.0
+    hits = [
+        low + i * step
+        for i in range(grid)
+        if membership_degree(low + i * step, mf) >= alpha
+    ]
+    if not hits:
+        return None
+    return min(hits), max(hits)
 
 
 _HTML_TEMPLATE = """<!doctype html>
@@ -227,8 +323,12 @@ _HTML_TEMPLATE = """<!doctype html>
               border-radius: 8px; background: #fafbfd; }
     summary { cursor: pointer; padding: 4px 0; font-size: 1.02em; }
     .fd-narrative { line-height: 1.6; }
-    .fd-clause { border-bottom: 1px dotted #c3ccd8; cursor: help; }
-    .fd-clause:hover { background: #eef3fa; }
+    .fd-clause { border-bottom: 1px dotted #c3ccd8; }
+    .fd-linked { cursor: pointer; }
+    .fd-linked:hover { background: #eef3fa; }
+    .fd-linked:focus { outline: 2px solid #3D6FA8; outline-offset: 1px; }
+    .fd-linked.fd-active { background: #ffe9a8; border-bottom-color: #E8A200; }
+    .fd-hint { color: #777; font-size: 0.85em; margin: 4px 0 0; }
     .fd-table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.92em; }
     .fd-table th, .fd-table td { border: 1px solid #e3e6ea; padding: 6px 8px; text-align: left; }
     .fd-table th { background: #f0f3f7; }
@@ -241,19 +341,104 @@ _HTML_TEMPLATE = """<!doctype html>
   {% for section in sections %}
     <h2>{{ section.title }}</h2>
     {{ section.html | safe }}
+    {% if loop.first %}
+    <p class="fd-hint">Click any sentence of a daily narrative to highlight the
+    segment of the signal that supports it; click it again to restore the full
+    view.</p>
+    {% endif %}
   {% endfor %}
   <footer>Generated by FuzzyDiary.</footer>
+  <script>
+  (function () {
+    var DIV_ID = "__SIGNAL_DIV_ID__";
+    var HIGHLIGHT = {
+      type: "rect", xref: "x", yref: "paper", y0: 0, y1: 1,
+      fillcolor: "rgba(0,0,0,0)", layer: "above",
+      line: { width: 2, color: "#111111" }
+    };
+
+    function isoLocal(ms) {
+      var d = new Date(ms);
+      return new Date(ms - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 19);
+    }
+
+    function chart() {
+      var gd = document.getElementById(DIV_ID);
+      return (gd && typeof Plotly !== "undefined" && gd.layout) ? gd : null;
+    }
+
+    function baseShapes(gd) {
+      if (gd._fdBaseShapes === undefined) {
+        gd._fdBaseShapes = (gd.layout.shapes || []).slice();
+      }
+      return gd._fdBaseShapes;
+    }
+
+    function clear(gd) {
+      Plotly.relayout(gd, { shapes: baseShapes(gd), "xaxis.autorange": true });
+    }
+
+    function highlight(gd, spans) {
+      var shapes = baseShapes(gd).slice();
+      var lo = null, hi = null;
+      spans.forEach(function (span) {
+        var rect = Object.assign({}, HIGHLIGHT, { x0: span[0], x1: span[1] });
+        shapes.push(rect);
+        var a = Date.parse(span[0]), b = Date.parse(span[1]);
+        if (lo === null || a < lo) { lo = a; }
+        if (hi === null || b > hi) { hi = b; }
+      });
+      var update = { shapes: shapes };
+      if (lo !== null && hi !== null) {
+        var pad = Math.max((hi - lo) * 0.5, 30 * 60 * 1000);
+        update["xaxis.range"] = [isoLocal(lo - pad), isoLocal(hi + pad)];
+      }
+      Plotly.relayout(gd, update);
+    }
+
+    function activate(el) {
+      var gd = chart();
+      if (!gd) { return; }
+      var spans;
+      try {
+        spans = JSON.parse(el.getAttribute("data-fd-spans") || "[]");
+      } catch (err) {
+        spans = [];
+      }
+      var wasActive = el.classList.contains("fd-active");
+      document.querySelectorAll(".fd-linked.fd-active").forEach(function (other) {
+        other.classList.remove("fd-active");
+      });
+      if (wasActive || !spans.length) {
+        clear(gd);
+        return;
+      }
+      el.classList.add("fd-active");
+      highlight(gd, spans);
+      gd.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    document.addEventListener("click", function (event) {
+      var el = event.target.closest(".fd-linked");
+      if (el) { activate(el); }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") { return; }
+      var el = event.target.closest && event.target.closest(".fd-linked");
+      if (el) { event.preventDefault(); activate(el); }
+    });
+  })();
+  </script>
 </body>
 </html>
-"""
+""".replace("__SIGNAL_DIV_ID__", _SIGNAL_DIV_ID)
 
 
-def _render_template(title: str, sections: list[dict], plotly_cdn: bool) -> str:
+def _render_template(title: str, sections: list[dict]) -> str:
     return Template(_HTML_TEMPLATE).render(title=title, sections=sections)
-
-
-def _truncate(text: str, n: int) -> str:
-    return text if len(text) <= n else text[: n - 1] + "…"
 
 
 def _escape_attr(text: str) -> str:

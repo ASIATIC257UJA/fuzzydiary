@@ -9,7 +9,6 @@ import pandas as pd
 from fuzzydiary.config import (
     EventDef,
     FuzzyDiaryConfig,
-    LabelCondition,
     LevelCondition,
     LinguisticVariable,
 )

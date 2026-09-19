@@ -108,11 +108,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
     daily = describe(series, events, cfg, simplified=simplified)
 
     output = Path(args.output)
-    if output.is_dir() or str(output).endswith("/"):
+    if output.is_dir() or str(output).endswith("/") or not output.suffix:
         output = output / "index.html"
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    path = render_report(series=series, events=events, daily=daily, output=output, cfg=cfg)
+    path = render_report(
+        series=series, events=events, daily=daily, output=output,
+        plotly_cdn=args.plotly_cdn, config=cfg,
+    )
     print(f"Report written to: {path}")
     return 0
 
@@ -127,8 +130,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="Run the full pipeline and render an HTML report.")
     p_run.add_argument("--config", required=True, type=Path)
     p_run.add_argument("--series", required=True, type=Path)
-    p_run.add_argument("--output", required=True, type=Path)
+    p_run.add_argument(
+        "--output", required=True, type=Path,
+        help="Output directory (the report is written to <dir>/index.html) "
+             "or an explicit .html file path.",
+    )
     p_run.add_argument("--epsilon", default="auto")
+    p_run.add_argument(
+        "--plotly-cdn", action="store_true",
+        help="Link the Plotly library from a CDN instead of embedding it. "
+             "Yields a much smaller file, but the report then requires "
+             "network access to render its charts.",
+    )
     p_run.set_defaults(func=_cmd_run)
 
     p_load = sub.add_parser("load", help="Ingest and inspect a series.")

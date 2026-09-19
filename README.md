@@ -1,8 +1,12 @@
 # FuzzyDiary
 
+[![install](https://github.com/ASIATIC257UJA/fuzzydiary/actions/workflows/install.yml/badge.svg)](https://github.com/ASIATIC257UJA/fuzzydiary/actions/workflows/install.yml)
+<!-- TODO: replace ZENODO_CONCEPT_ID with the identifier Zenodo assigns on the first release -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.ZENODO_CONCEPT_ID.svg)](https://doi.org/10.5281/zenodo.ZENODO_CONCEPT_ID)
+
 **An open-source framework for morphology-aware and traceable linguistic summarization of clinical time series.**
 
-FuzzyDiary transforms a univariate time series and a YAML configuration file into a self-contained, auditable narrative report. The framework detects morphological events (peaks, valleys, sustained increases and decreases, plateaus, oscillations, and regime changes), evaluates fuzzy protoforms, aggregates the resulting summaries over user-defined periods, and generates an interactive HTML report in which every textual statement can be traced back to the original signal.
+FuzzyDiary transforms a univariate time series and a YAML configuration file into a self-contained, auditable narrative report. The framework detects morphological events (peaks, valleys, sustained increases and decreases, plateaus, oscillations, and regime changes), evaluates fuzzy protoforms, synthesizes the resulting statements into a cohesive narrative for each reporting period, and generates an interactive HTML report in which every textual statement can be traced back to the original signal.
 
 The framework is domain-independent and can be applied to any univariate signal for which linguistic variables, fuzzy quantifiers, qualifiers, and morphological events can be defined through a YAML configuration.
 
@@ -15,7 +19,7 @@ FuzzyDiary is intended for analysts and researchers who need to transform raw un
 * **Protoform-based linguistic summarization** using configurable fuzzy linguistic variables, quantifiers, and contexts.
 * **Morphological event detection** (peaks, valleys, sustained increases/decreases, plateaus, oscillations, and regime changes) applied to RDP-simplified time series.
 * **Automatic or manual epsilon selection** for the RDP simplification process.
-* **Data descriptions** generated over user-defined time periods.
+* **Data descriptions** generated for each reporting period (the calendar day).
 * **Self-contained interactive HTML reports** in which every textual statement is linked to the corresponding segment of the original signal, ensuring full traceability.
 * **YAML-driven configuration**, allowing adaptation to new signals or domains without modifying the source code.
 * **Command-line interface** (`fuzzydiary`) and **Python API** for programmatic integration.
@@ -32,7 +36,7 @@ FuzzyDiary is intended for analysts and researchers who need to transform raw un
 
 The following Python dependencies are installed automatically:
 
-`numpy`, `pandas`, `scipy`, `scikit-learn`, `scikit-fuzzy`, `rdp`, `pydantic`, `PyYAML`, `plotly`, and `jinja2`.
+`numpy`, `pandas`, `rdp`, `pydantic`, `PyYAML`, `plotly`, and `jinja2`.
 
 ---
 
@@ -103,6 +107,15 @@ fuzzydiary run \
 
 Open `./report/index.html` in any modern web browser to explore the interactive report.
 
+`--output` accepts either a directory --- the report is then written to
+`<directory>/index.html` --- or an explicit `.html` file path.
+
+The report is self-contained: the Plotly library is embedded in the generated
+file, so the charts render without network access and the report can be
+archived as a single artifact. Pass `--plotly-cdn` to link the library from a
+CDN instead, which produces a much smaller file at the cost of requiring
+connectivity when the report is opened.
+
 ---
 
 ## Example Use Case
@@ -110,7 +123,7 @@ Open `./report/index.html` in any modern web browser to explore the interactive 
 The repository includes a ready-to-run example based on **Continuous Glucose Monitoring (CGM)** data:
 
 * **Dataset:** `example_data/data.csv` — CGM measurements sampled every five minutes.
-* **Configuration:** `example_yaml/config_glucose.yaml` — defines the linguistic variable (`very_low`, `low`, `medium`, `high`, `very_high`), fuzzy quantifiers (`many`, `most`, `almost_all`), the `day_moment` context (`night`, `morning`, `afternoon`, `evening`), and the meal-related context (`breakfast`, `lunch`, `dinner`).
+* **Configuration:** `example_yaml/config_glucose.yaml` — defines the linguistic variable (`very_low`, `low`, `medium`, `high`, `very_high`), fuzzy quantifiers (`many`, `most`, `almost_all`), the `day_moment` context (`night`, `morning`, `afternoon`, `end of the day`), and the meal-related context (`breakfast`, `lunch`, `dinner`).
 
 Run the complete workflow with:
 
@@ -122,6 +135,21 @@ fuzzydiary run \
 ```
 
 The generated `report/index.html` contains the linguistic narratives describing the selected period, together with interactive visualizations in which every textual statement is linked to the corresponding segment of the original signal.
+
+---
+
+## Continuous Integration
+
+Every push is checked by GitHub Actions on Linux, macOS and Windows and on
+Python 3.10 to 3.13: the package is installed into a clean environment, the two
+shipped examples are run from end to end, and the generated report is verified
+to be self-contained --- no remote resource is fetched when it is opened.
+
+---
+
+## Citing FuzzyDiary
+
+Every release is archived on Zenodo and receives its own DOI.
 
 ---
 

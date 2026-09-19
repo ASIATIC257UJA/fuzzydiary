@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from fuzzydiary.aggregation_fuzzy import AggregationResult, aggregate_labels
-from fuzzydiary.config import FuzzyDiaryConfig, ProtoformTemplate, load_config
+from fuzzydiary.config import FuzzyDiaryConfig, load_config
 from fuzzydiary.context import label_event_with_contexts
 from fuzzydiary.events import Event, EventCollection
 from fuzzydiary.fuzzy import membership_degree
@@ -35,8 +35,6 @@ class EventDescription:
     contexts: dict[str, tuple[str, float]] = field(default_factory=dict)
     statements: list[Statement] = field(default_factory=list)
 
-
-SegmentDescription = EventDescription
 
 
 @dataclass
@@ -228,7 +226,7 @@ def _instantiate_event_statements(
             ctx_names = {dim.name for dim in cfg.contexts}
             for tmpl in cfg.protoforms:
                 if any(("{" + name + "}") in tmpl.template for name in ctx_names):
-                    continue  # handled at day level
+                    continue
                 try:
                     rendered = tmpl.template.format(**placeholders)
                 except KeyError:

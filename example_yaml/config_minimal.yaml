@@ -1,0 +1,30 @@
+linguistic_variable:
+  universe_min: 0
+  universe_max: 200
+  terms:
+    low:    {a: 0,   b: 0,   c: 70,  d: 90}
+    medium: {a: 70,  b: 90,  c: 140, d: 160}
+    high:   {a: 140, b: 160, c: 200, d: 200}
+
+quantifiers:
+  - name: "some"
+    membership: {a: 0.2, b: 0.4, c: 0.6, d: 0.8}
+  - name: "most"
+    membership: {a: 0.6, b: 0.8, c: 1.0, d: 1.0}
+
+events:
+  catalogue:
+    - label: low_episode
+      pattern:
+        - level: [low]
+      min_duration_minutes: 15
+      merge_gap_minutes: 30
+
+    - label: high_episode
+      pattern:
+        - level: [high]
+      min_duration_minutes: 15
+      merge_gap_minutes: 30
+
+protoforms:
+  - template: "{Q} of the values of the {kind} are {A}"

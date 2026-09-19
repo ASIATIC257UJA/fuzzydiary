@@ -34,7 +34,6 @@ class SynthesisNode:
         return float(self.statement.truth)
 
     def flatten(self) -> list[Statement]:
-        """This node's statement plus every statement below it."""
         out = [self.statement]
         for child in self.children:
             out.extend(child.flatten())
