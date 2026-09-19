@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 import warnings
 
@@ -11,6 +12,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=DeprecationWarning)
     from rdp import rdp
 
+from fuzzydiary.config import FuzzyDiaryConfig, load_config
 from fuzzydiary.io import Series
 
 
@@ -39,9 +41,15 @@ class SimplifiedSeries:
 
 def simplify(
     series: Series,
-    epsilon: float | Literal["auto"] = "auto",
-    auto_std_fraction: float = 0.2,
+    epsilon: float | Literal["auto"] | None = None,
+    auto_std_fraction: float | None = None,
+    config: FuzzyDiaryConfig | str | Path | None = None,
 ) -> SimplifiedSeries:
+    cfg = config if config is None or isinstance(config, FuzzyDiaryConfig) else load_config(config)
+    if epsilon is None:
+        epsilon = cfg.rdp.epsilon if cfg is not None else "auto"
+    if auto_std_fraction is None:
+        auto_std_fraction = cfg.rdp.auto_std_fraction if cfg is not None else 0.2
     if not isinstance(series, Series):
         raise TypeError(f"Expected a Series, got {type(series).__name__}.")
     if epsilon != "auto" and not isinstance(epsilon, (int, float)):

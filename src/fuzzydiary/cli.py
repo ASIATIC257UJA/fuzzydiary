@@ -16,8 +16,10 @@ from fuzzydiary.config import load_config
 from fuzzydiary.nlg import narrate_day_paragraph
 
 
-def _resolve_eps(value: str) -> float | str:
-    return "auto" if value == "auto" else float(value)
+def _resolve_eps(value: str | None) -> float | str | None:
+    if value is None or value == "auto":
+        return value
+    return float(value)
 
 
 def _cmd_version(args: argparse.Namespace) -> int:
@@ -38,7 +40,7 @@ def _cmd_load(args: argparse.Namespace) -> int:
 def _cmd_simplify(args: argparse.Namespace) -> int:
     cfg = load_config(args.config) if args.config else None
     series = load_series(args.series, config=cfg)
-    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon), config=cfg)
     print(f"Simplified {simplified.n_days} day(s).")
     for day, df in simplified.days.items():
         used = simplified.epsilon_used[day]
@@ -53,7 +55,7 @@ def _cmd_events(args: argparse.Namespace) -> int:
         return 2
     cfg = load_config(args.config)
     series = load_series(args.series, config=cfg)
-    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon), config=cfg)
     events = detect_events(simplified, config=cfg, series=series)
 
     print(f"Detected {events.n_events} event(s) across {events.n_days} day(s).")
@@ -72,7 +74,7 @@ def _cmd_describe(args: argparse.Namespace) -> int:
         return 2
     cfg = load_config(args.config)
     series = load_series(args.series, config=cfg)
-    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon), config=cfg)
     events = detect_events(simplified, config=cfg, series=series)
     daily = describe(series, events, cfg, simplified=simplified)
 
@@ -90,7 +92,7 @@ def _cmd_narrate(args: argparse.Namespace) -> int:
         return 2
     cfg = load_config(args.config)
     series = load_series(args.series, config=cfg)
-    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon), config=cfg)
     events = detect_events(simplified, config=cfg, series=series)
     daily = describe(series, events, cfg, simplified=simplified)
 
@@ -103,7 +105,7 @@ def _cmd_narrate(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     series = load_series(args.series, config=cfg)
-    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon))
+    simplified = simplify(series, epsilon=_resolve_eps(args.epsilon), config=cfg)
     events = detect_events(simplified, config=cfg, series=series)
     daily = describe(series, events, cfg, simplified=simplified)
 
@@ -135,7 +137,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory (the report is written to <dir>/index.html) "
              "or an explicit .html file path.",
     )
-    p_run.add_argument("--epsilon", default="auto")
+    p_run.add_argument("--epsilon", default=None)
     p_run.add_argument(
         "--plotly-cdn", action="store_true",
         help="Link the Plotly library from a CDN instead of embedding it. "
@@ -152,19 +154,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p_simp = sub.add_parser("simplify", help="RDP geometric simplification.")
     p_simp.add_argument("--config", type=Path, default=None)
     p_simp.add_argument("--series", required=True, type=Path)
-    p_simp.add_argument("--epsilon", default="auto")
+    p_simp.add_argument("--epsilon", default=None)
     p_simp.set_defaults(func=_cmd_simplify)
 
     p_ev = sub.add_parser("events", help="Event detection.")
     p_ev.add_argument("--config", required=True, type=Path)
     p_ev.add_argument("--series", required=True, type=Path)
-    p_ev.add_argument("--epsilon", default="auto")
+    p_ev.add_argument("--epsilon", default=None)
     p_ev.set_defaults(func=_cmd_events)
 
     p_desc = sub.add_parser("describe", help="Per-day linguistic description.")
     p_desc.add_argument("--config", required=True, type=Path)
     p_desc.add_argument("--series", required=True, type=Path)
-    p_desc.add_argument("--epsilon", default="auto")
+    p_desc.add_argument("--epsilon", default=None)
     p_desc.set_defaults(func=_cmd_describe)
 
     p_nar = sub.add_parser(
@@ -173,7 +175,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_nar.add_argument("--config", required=True, type=Path)
     p_nar.add_argument("--series", required=True, type=Path)
-    p_nar.add_argument("--epsilon", default="auto")
+    p_nar.add_argument("--epsilon", default=None)
     p_nar.set_defaults(func=_cmd_narrate)
 
     p_ver = sub.add_parser("version", help="Print version.")
