@@ -33,6 +33,41 @@ def aggregate_labels(
     )
 
 
+@dataclass
+class QualifiedResult:
+    qualifier_term: str
+    summarizer_term: str
+    ratio: float
+    quantifier: str | None
+    quantifier_md: float
+
+
+def aggregate_qualified(
+    sample_memberships: list[dict[str, float]],
+    variable: LinguisticVariable,
+    quantifiers: list[Quantifier],
+    acceptance_threshold: float = 0.5,
+) -> list[QualifiedResult]:
+    out: list[QualifiedResult] = []
+    if not sample_memberships:
+        return out
+    for a_term in variable.terms:
+        denominator = sum(float(m.get(a_term, 0.0)) for m in sample_memberships)
+        if denominator <= 0:
+            continue
+        for b_term in variable.terms:
+            if b_term == a_term:
+                continue
+            numerator = sum(
+                min(float(m.get(a_term, 0.0)), float(m.get(b_term, 0.0)))
+                for m in sample_memberships
+            )
+            ratio = numerator / denominator
+            name, md = _select_rightmost_passing(ratio, quantifiers, acceptance_threshold)
+            out.append(QualifiedResult(a_term, b_term, ratio, name, md))
+    return out
+
+
 def _compute_proportions(
     sample_memberships: list[dict[str, float]],
     variable: LinguisticVariable,

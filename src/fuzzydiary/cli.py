@@ -110,7 +110,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     daily = describe(series, events, cfg, simplified=simplified)
 
     output = Path(args.output)
-    if output.is_dir() or str(output).endswith("/") or not output.suffix:
+    if output.suffix.lower() not in (".html", ".htm"):
         output = output / "index.html"
     output.parent.mkdir(parents=True, exist_ok=True)
 

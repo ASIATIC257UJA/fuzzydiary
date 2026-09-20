@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from fuzzydiary.aggregation_fuzzy import AggregationResult, aggregate_labels
+from fuzzydiary.aggregation_fuzzy import AggregationResult, aggregate_labels, aggregate_qualified
 from fuzzydiary.config import FuzzyDiaryConfig, load_config
 from fuzzydiary.context import label_event_with_contexts
 from fuzzydiary.events import Event, EventCollection
@@ -128,7 +128,7 @@ def _describe_event(
 
     contexts = label_event_with_contexts(elem, cfg.contexts)
     statements = _instantiate_event_statements(
-        elem, char_level, agg, contexts, cfg, dot_threshold
+        elem, char_level, agg, contexts, cfg, dot_threshold, sample_memberships
     )
 
     return EventDescription(
@@ -181,6 +181,7 @@ def _instantiate_event_statements(
     contexts: dict[str, tuple[str, float]],
     cfg: FuzzyDiaryConfig,
     dot_threshold: float,
+    sample_memberships: list[dict[str, float]] | None = None,
 ) -> list[Statement]:
     statements: list[Statement] = []
 
@@ -227,6 +228,8 @@ def _instantiate_event_statements(
             for tmpl in cfg.protoforms:
                 if any(("{" + name + "}") in tmpl.template for name in ctx_names):
                     continue
+                if "{B}" in tmpl.template:
+                    continue
                 try:
                     rendered = tmpl.template.format(**placeholders)
                 except KeyError:
@@ -248,6 +251,70 @@ def _instantiate_event_statements(
                         },
                     )
                 )
+
+    statements.extend(
+        _instantiate_qualified_statements(
+            elem, contexts, cfg, dot_threshold, sample_memberships or []
+        )
+    )
+    return statements
+
+
+def _instantiate_qualified_statements(
+    elem: Event,
+    contexts: dict[str, tuple[str, float]],
+    cfg: FuzzyDiaryConfig,
+    dot_threshold: float,
+    sample_memberships: list[dict[str, float]],
+) -> list[Statement]:
+    ctx_names = {dim.name for dim in cfg.contexts}
+    templates = [
+        tmpl for tmpl in cfg.protoforms
+        if "{B}" in tmpl.template and "{A}" in tmpl.template
+        and not any(("{" + name + "}") in tmpl.template for name in ctx_names)
+    ]
+    if not templates or not sample_memberships:
+        return []
+
+    statements: list[Statement] = []
+    for result in aggregate_qualified(
+        sample_memberships, cfg.linguistic_variable, cfg.quantifiers
+    ):
+        if result.quantifier is None or result.quantifier_md < dot_threshold:
+            continue
+        placeholders = {
+            "Q": result.quantifier,
+            "A": result.qualifier_term,
+            "B": result.summarizer_term,
+            "kind": elem.kind,
+            "level": result.summarizer_term,
+        }
+        for ctx_name, (ctx_term, _md) in contexts.items():
+            placeholders[ctx_name] = ctx_term
+        for tmpl in templates:
+            try:
+                rendered = tmpl.template.format(**placeholders)
+            except KeyError:
+                continue
+            statements.append(
+                Statement(
+                    text=rendered,
+                    template=tmpl.template,
+                    truth=float(result.quantifier_md),
+                    simplicity=max(0.0, 1.0 - 0.1 * tmpl.template.count("{")),
+                    evidence={
+                        "form": "qualified",
+                        "kind": elem.kind,
+                        "start": elem.start,
+                        "end": elem.end,
+                        "qualifier_term": result.qualifier_term,
+                        "term": result.summarizer_term,
+                        "quantifier": result.quantifier,
+                        "ratio": result.ratio,
+                        "scope": "event_interval",
+                    },
+                )
+            )
     return statements
 
 
@@ -266,9 +333,15 @@ def _describe_day_protoforms(
 
     for ctx_dim in cfg.contexts:
         ctx_templates = [
-            t for t in cfg.protoforms if "{" + ctx_dim.name + "}" in t.template
+            t for t in cfg.protoforms
+            if "{" + ctx_dim.name + "}" in t.template and "{B}" not in t.template
         ]
-        if not ctx_templates:
+        qualified_templates = [
+            t for t in cfg.protoforms
+            if "{" + ctx_dim.name + "}" in t.template
+            and "{B}" in t.template and "{A}" in t.template
+        ]
+        if not ctx_templates and not qualified_templates:
             continue
 
         for r_term in ctx_dim.terms:
@@ -276,6 +349,14 @@ def _describe_day_protoforms(
             r_sum = sum(r_md)
             if r_sum <= 0:
                 continue
+
+            if qualified_templates:
+                statements.extend(
+                    _qualified_day_statements(
+                        ctx_dim, r_term, r_md, values, cfg,
+                        dot_threshold, qualified_templates,
+                    )
+                )
 
             for a_term in cfg.linguistic_variable.terms:
                 num = 0.0
@@ -316,6 +397,71 @@ def _describe_day_protoforms(
                             },
                         )
                     )
+    return statements
+
+
+def _qualified_day_statements(
+    ctx_dim,
+    r_term: str,
+    r_md: list[float],
+    values,
+    cfg: FuzzyDiaryConfig,
+    dot_threshold: float,
+    templates,
+) -> list[Statement]:
+    term_md: dict[str, list[float]] = {}
+    for term in cfg.linguistic_variable.terms:
+        mf = cfg.linguistic_variable.mf_as_dict(term)
+        term_md[term] = [
+            0.0 if pd.isna(v) else membership_degree(float(v), mf) for v in values
+        ]
+
+    statements: list[Statement] = []
+    for a_term in cfg.linguistic_variable.terms:
+        denominator = sum(
+            min(md_r, md_a) for md_r, md_a in zip(r_md, term_md[a_term])
+        )
+        if denominator <= 0:
+            continue
+        for b_term in cfg.linguistic_variable.terms:
+            if b_term == a_term:
+                continue
+            numerator = sum(
+                min(md_r, md_a, md_b)
+                for md_r, md_a, md_b in zip(r_md, term_md[a_term], term_md[b_term])
+            )
+            ratio = numerator / denominator
+            q_name, q_md = _select_quantifier(ratio, cfg)
+            if q_name is None or q_md < dot_threshold:
+                continue
+            placeholders = {
+                "Q": q_name,
+                "A": a_term,
+                "B": b_term,
+                ctx_dim.name: r_term,
+            }
+            for tmpl in templates:
+                try:
+                    rendered = tmpl.template.format(**placeholders)
+                except KeyError:
+                    continue
+                statements.append(
+                    Statement(
+                        text=rendered,
+                        template=tmpl.template,
+                        truth=q_md,
+                        simplicity=max(0.0, 1.0 - 0.1 * tmpl.template.count("{")),
+                        evidence={
+                            "form": "qualified",
+                            "scope": "day",
+                            "qualifier": r_term,
+                            "qualifier_term": a_term,
+                            "term": b_term,
+                            "quantifier": q_name,
+                            "ratio": ratio,
+                        },
+                    )
+                )
     return statements
 
 

@@ -299,6 +299,8 @@ def synthesize_day(
 
     unscoped: list[Statement] = []
     for statement in summary.day_protoforms:
+        if statement.evidence.get("form") == "qualified":
+            continue
         qualifier = str(statement.evidence.get("qualifier", ""))
         group = by_qualifier.get(qualifier)
         if group is not None:
