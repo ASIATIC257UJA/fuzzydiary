@@ -1,8 +1,7 @@
 # FuzzyDiary
 
 [![install](https://github.com/ASIATIC257UJA/fuzzydiary/actions/workflows/install.yml/badge.svg)](https://github.com/ASIATIC257UJA/fuzzydiary/actions/workflows/install.yml)
-<!-- TODO: replace ZENODO_CONCEPT_ID with the identifier Zenodo assigns on the first release -->
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.ZENODO_CONCEPT_ID.svg)](https://doi.org/10.5281/zenodo.ZENODO_CONCEPT_ID)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22856006.svg)](https://doi.org/10.5281/zenodo.22856006)
 
 **An open-source framework for morphology-aware and traceable linguistic summarization of clinical time series.**
 
@@ -149,7 +148,10 @@ to be self-contained --- no remote resource is fetched when it is opened.
 
 ## Citing FuzzyDiary
 
-Every release is archived on Zenodo and receives its own DOI.
+Every release is archived on Zenodo and receives its own DOI. The DOI
+[10.5281/zenodo.22856006](https://doi.org/10.5281/zenodo.22856006) always resolves
+to the latest version; version v0.2.0 is archived as
+[10.5281/zenodo.22856007](https://doi.org/10.5281/zenodo.22856007).
 
 ---
 

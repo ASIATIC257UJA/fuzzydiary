@@ -1,0 +1,35 @@
+{
+  "title": "FuzzyDiary: An open-source framework for morphology-aware and traceable linguistic summarization of clinical time series",
+  "description": "<p>FuzzyDiary is an open-source Python framework for protoform-based, morphology-aware linguistic summarization of univariate time series. It couples Ramer-Douglas-Peucker simplification with a configurable catalogue of morphological events and fuzzy protoform evaluation, driven by a single YAML configuration, and produces a self-contained interactive HTML report in which every generated statement is linked to the segment of the signal that supports it. The framework is domain-independent; clinical monitoring is its motivating application.</p>",
+  "upload_type": "software",
+  "license": "mit",
+  "access_right": "open",
+  "version": "0.2.0",
+  "language": "eng",
+  "keywords": [
+    "linguistic summarization",
+    "fuzzy protoforms",
+    "time series",
+    "explainable artificial intelligence",
+    "clinical monitoring",
+    "continuous glucose monitoring"
+  ],
+  "creators": [
+    {
+      "name": "Gaitán-Guerrero, Juan Francisco",
+      "affiliation": "Computer Science Department, University of Jaén, Jaén, Spain"
+    },
+    {
+      "name": "López-Ruiz, José Luis",
+      "affiliation": "Computer Science Department, University of Jaén, Jaén, Spain"
+    },
+    {
+      "name": "Martínez-Cruz, Carmen",
+      "affiliation": "Department of Languages and Computer Systems, University of Granada, Granada, Spain"
+    },
+    {
+      "name": "Espinilla, Macarena",
+      "affiliation": "Computer Science Department, University of Jaén, Jaén, Spain"
+    }
+  ]
+}

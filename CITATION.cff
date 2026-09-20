@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+title: "FuzzyDiary: An open-source framework for morphology-aware and traceable linguistic summarization of clinical time series"
+abstract: >-
+  FuzzyDiary is an open-source Python framework for protoform-based,
+  morphology-aware linguistic summarization of univariate time series. It
+  couples Ramer-Douglas-Peucker simplification with a configurable catalogue of
+  morphological events and fuzzy protoform evaluation, driven by a single YAML
+  configuration, and produces a self-contained interactive HTML report in which
+  every generated statement is linked to the segment of the signal that
+  supports it.
+type: software
+version: 0.2.0
+date-released: 2026-09-19
+license: MIT
+repository-code: "https://github.com/ASIATIC257UJA/fuzzydiary"
+keywords:
+  - linguistic summarization
+  - fuzzy protoforms
+  - time series
+  - explainability
+  - clinical monitoring
+  - continuous glucose monitoring
+authors:
+  - family-names: "Gaitán-Guerrero"
+    given-names: "Juan Francisco"
+    email: "jgaitan@ujaen.es"
+    affiliation: "Computer Science Department, University of Jaén, Jaén, Spain"
+  - family-names: "López-Ruiz"
+    given-names: "José Luis"
+    email: "llopez@ujaen.es"
+    affiliation: "Computer Science Department, University of Jaén, Jaén, Spain"
+  - family-names: "Martínez-Cruz"
+    given-names: "Carmen"
+    email: "cmcruz@ugr.es"
+    affiliation: "Department of Languages and Computer Systems, University of Granada, Granada, Spain"
+  - family-names: "Espinilla"
+    given-names: "Macarena"
+    email: "mestevez@ujaen.es"
+    affiliation: "Computer Science Department, University of Jaén, Jaén, Spain"
